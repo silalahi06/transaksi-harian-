@@ -63,7 +63,7 @@ input,select,button{padding:10px;border-radius:8px;border:1px solid #ddd;font-si
 
 <div class="card actions">
 <button class="btn-primary" onclick="sharePNG()">Share WhatsApp</button>
-<button class="btn-primary" onclick="downloadPDF()">Rekap Bulanan (PDF Rapi)</button>
+<button class="btn-primary" onclick="downloadPDF()">Rekap Bulanan (PDF)</button>
 </div>
 
 <script>
@@ -152,7 +152,7 @@ pdf.text('REKAP TRANSAKSI BULANAN',10,y); y+=7;
 const dates=Object.keys(db).sort();
 if(dates.length===0){alert('Data kosong'); return;}
 
-const monthText=new Date(dates[0].slice(0,7)+'-01')
+const monthText=new Date(dates[0].slice(0,7))
 .toLocaleDateString('id-ID',{month:'long',year:'numeric'}).toUpperCase();
 pdf.setFontSize(12);
 pdf.text(monthText,10,y); y+=6;
