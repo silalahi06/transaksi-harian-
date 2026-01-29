@@ -30,6 +30,11 @@ input,select,button{padding:10px;border-radius:8px;border:1px solid #ddd;font-si
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .btn-primary{background:#2563eb;color:#fff;border:none;}
 #tanggalInput{display:none;} .col-aksi{}
+
+.btn-primary{background:#2563eb;color:#fff;border:none;padding:10px;border-radius:8px}
+.btn-main{background:#22c55e;color:#fff;border:none;padding:10px;border-radius:8px}
+.btn-danger{background:#ef4444;color:#fff;border:none;padding:10px;border-radius:8px}
+  
 </style>
 </head>
 <body>
@@ -66,6 +71,26 @@ input,select,button{padding:10px;border-radius:8px;border:1px solid #ddd;font-si
 <button class="btn-primary" onclick="downloadPDF()">Rekap Bulanan (PDF)</button>
 </div>
 
+<!-- ADVANCE MENU -->
+<div class="card" style="margin-top:20px">
+  <button id="btnAdvance" class="btn-primary" onclick="toggleAdvance()">
+    Advance
+  </button>
+
+  <div id="advanceMenu" style="display:none; margin-top:10px">
+    <button class="btn-main" onclick="backupData()" style="width:100%;margin-bottom:8px">
+      Backup Data
+    </button>
+
+    <button class="btn-danger" onclick="triggerRestore()" style="width:100%">
+      Restore Data
+    </button>
+
+    <input type="file" id="restoreFile" accept=".json" style="display:none">
+  </div>
+</div>
+  
+  
 <script>
 const { jsPDF } = window.jspdf;
 const STORAGE_KEY='trx_by_date_v7';
@@ -218,6 +243,55 @@ loadTanggal();
 });
 
 loadDB();
+
+function toggleAdvance(){
+  const menu = document.getElementById('advanceMenu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+/* ===== BACKUP ===== */
+function backupData(){
+  const data = localStorage.getItem(STORAGE_KEY);
+
+  if(!data){
+    alert('Tidak ada data untuk dibackup');
+    return;
+  }
+
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'backup-transaksi.json';
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+
+/* ===== RESTORE ===== */
+function triggerRestore(){
+  document.getElementById('restoreFile').click();
+}
+
+document.getElementById('restoreFile').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    try{
+      JSON.parse(evt.target.result); // validasi JSON
+      localStorage.setItem(STORAGE_KEY, evt.target.result);
+      alert('Restore berhasil, aplikasi akan dimuat ulang');
+      location.reload();
+    }catch(err){
+      alert('File backup tidak valid');
+    }
+  };
+  reader.readAsText(file);
+});
+  
 </script>
 
 </body>
