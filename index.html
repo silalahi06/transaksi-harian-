@@ -86,6 +86,13 @@ input,select,button{padding:10px;border-radius:8px;border:1px solid #ddd;font-si
       Restore Data
     </button>
 
+    <button class="btn-danger"
+        onclick="deleteAllData()"
+        style="width:100%;margin-top:8px">
+  Delete All Data
+    </button>
+    
+
     <input type="file" id="restoreFile" accept=".json" style="display:none">
   </div>
 </div>
@@ -291,6 +298,26 @@ document.getElementById('restoreFile').addEventListener('change', function(e){
   };
   reader.readAsText(file);
 });
+
+  function deleteAllData(){
+  const confirm1 = confirm(
+    'PERINGATAN!\n\nSemua data transaksi di SEMUA tanggal akan DIHAPUS.\n\nLanjutkan?'
+  );
+
+  if(!confirm1) return;
+
+  const confirm2 = confirm(
+    'Konfirmasi terakhir!\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN kecuali dari BACKUP.\n\nYakin hapus semua data?'
+  );
+
+  if(!confirm2) return;
+
+  // 🔥 Hapus seluruh data aplikasi
+  localStorage.removeItem(STORAGE_KEY);
+
+  alert('Semua data berhasil dihapus.\nAplikasi akan dimuat ulang.');
+  location.reload();
+  }
   
 </script>
 
