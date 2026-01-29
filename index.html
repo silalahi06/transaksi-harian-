@@ -1,1 +1,219 @@
 
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transaksi Harian</title>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<style>
+:root{--primary:#1e40af;--danger:#ef4444;--secondary:#22c55e;--bg:#f8fafc;}
+body{font-family:Arial;background:var(--bg);margin:12px;}
+.card{background:#fff;border-radius:16px;padding:14px;box-shadow:0 4px 14px rgba(0,0,0,.1);margin-bottom:12px;}
+h1{text-align:center;color:var(--primary);margin-bottom:10px;}
+.date-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;}
+.nav-btn{width:44px;height:44px;border-radius:50%;border:4px solid #bdbdbd;background:linear-gradient(#5dade2,#1f5fbf);color:#fff;font-size:22px;font-weight:bold;cursor:pointer;}
+.date-text{font-weight:bold;color:#1e3a8a;cursor:pointer;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th,td{border:1px solid #ddd;padding:6px;text-align:center;}
+th{background:#eef2ff;}
+.aksi{display:flex;justify-content:center;gap:6px;}
+.aksi button{padding:6px 14px;border-radius:999px;border:none;color:#fff;font-size:12px;cursor:pointer;}
+.btn-edit{background:#2563eb;}
+.btn-hapus{background:var(--danger);}
+.total{text-align:right;font-weight:bold;color:#1e40af;margin-top:8px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+input,select,button{padding:10px;border-radius:8px;border:1px solid #ddd;font-size:14px;}
+.btn-main{background:var(--secondary);border:none;color:#fff;}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.btn-primary{background:#2563eb;color:#fff;border:none;}
+#tanggalInput{display:none;} .col-aksi{}
+</style>
+</head>
+<body>
+
+<div id="capture" class="card">
+<h1>TRANSAKSI HARIAN</h1>
+<div class="date-nav">
+<button class="nav-btn" onclick="changeDate(-1)">«</button>
+<span class="date-text" id="tanggalText" onclick="tanggalInput.showPicker()"></span>
+<button class="nav-btn" onclick="changeDate(1)">»</button>
+<input type="date" id="tanggalInput">
+</div>
+
+<table>
+<thead><tr><th>NO</th><th>TRANSAKSI</th><th>JUMLAH</th><th>TOTAL</th><th class="col-aksi">AKSI</th></tr></thead>
+<tbody id="tbody"></tbody>
+</table>
+<div class="total">TOTAL : <span id="grandTotal">0</span></div>
+</div>
+
+<div class="card">
+<div class="form-row">
+<select id="transaksi"><option>TRANSFER</option><option>PULSA</option><option>TOKEN</option><option>LAINNYA</option></select>
+<input type="number" id="jumlah" placeholder="Jumlah">
+</div>
+<div class="form-row">
+<input type="number" id="admin" placeholder="Admin (disembunyikan)">
+<button id="btnSubmit" class="btn-main" onclick="submitForm()">Tambah</button>
+</div>
+</div>
+
+<div class="card actions">
+<button class="btn-primary" onclick="sharePNG()">Share WhatsApp</button>
+<button class="btn-primary" onclick="downloadPDF()">Rekap Bulanan (PDF)</button>
+</div>
+
+<script>
+const { jsPDF } = window.jspdf;
+const STORAGE_KEY='trx_by_date_v7';
+const tbody=document.getElementById('tbody');
+const tanggalInput=document.getElementById('tanggalInput');
+const tanggalText=document.getElementById('tanggalText');
+const grandTotalEl=document.getElementById('grandTotal');
+const transaksiEl=document.getElementById('transaksi');
+const jumlahEl=document.getElementById('jumlah');
+const adminEl=document.getElementById('admin');
+const btnSubmit=document.getElementById('btnSubmit');
+let db={}, data=[], editIndex=-1;
+
+function rupiah(n){return n.toLocaleString('id-ID');}
+function tglIndo(v){return new Date(v).toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'}).toUpperCase();}
+
+function loadDB(){
+db=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');
+const d=new Date(); d.setDate(d.getDate()-1);
+tanggalInput.value=d.toISOString().split('T')[0];
+tanggalText.textContent=tglIndo(tanggalInput.value);
+loadTanggal();
+}
+
+function loadTanggal(){data=db[tanggalInput.value]||[]; render();}
+
+function changeDate(step){
+const d=new Date(tanggalInput.value);
+d.setDate(d.getDate()+step);
+tanggalInput.value=d.toISOString().split('T')[0];
+tanggalText.textContent=tglIndo(tanggalInput.value);
+loadTanggal();
+}
+
+function render(){
+tbody.innerHTML=''; let total=0;
+data.forEach((d,i)=>{
+const t=d.jumlah+d.admin; total+=t;
+tbody.innerHTML+=`<tr>
+<td>${i+1}</td><td>${d.transaksi}</td><td>${rupiah(d.jumlah)}</td><td>${rupiah(t)}</td>
+<td class="col-aksi"><div class="aksi">
+<button class="btn-edit" onclick="editRow(${i})">Edit</button>
+<button class="btn-hapus" onclick="hapusRow(${i})">Hapus</button>
+</div></td></tr>`;
+});
+grandTotalEl.textContent=rupiah(total);
+db[tanggalInput.value]=data;
+localStorage.setItem(STORAGE_KEY,JSON.stringify(db));
+}
+
+function submitForm(){
+const obj={transaksi:transaksiEl.value,jumlah:+jumlahEl.value||0,admin:+adminEl.value||0};
+if(!obj.jumlah) return alert('Jumlah kosong');
+if(editIndex<0) data.push(obj);
+else{data[editIndex]=obj; editIndex=-1; btnSubmit.textContent='Tambah';}
+jumlahEl.value=''; adminEl.value='';
+render();
+}
+
+function editRow(i){
+const d=data[i];
+transaksiEl.value=d.transaksi; jumlahEl.value=d.jumlah; adminEl.value=d.admin;
+editIndex=i; btnSubmit.textContent='Simpan';
+}
+
+function hapusRow(i){if(confirm('Hapus transaksi?')){data.splice(i,1); render();}}
+
+async function sharePNG(){
+document.querySelectorAll('.col-aksi').forEach(e=>e.style.display='none');
+const canvas=await html2canvas(document.getElementById('capture'));
+const blob=await new Promise(r=>canvas.toBlob(r));
+document.querySelectorAll('.col-aksi').forEach(e=>e.style.display='');
+const file=new File([blob],'transaksi.png',{type:'image/png'});
+if(navigator.canShare&&navigator.canShare({files:[file]}))
+navigator.share({files:[file],title:'Transaksi Harian'});
+}
+
+function downloadPDF(){
+const pdf=new jsPDF('p','mm','a4');
+let y=12;
+pdf.setFontSize(14);
+pdf.text('REKAP TRANSAKSI BULANAN',10,y); y+=7;
+
+const dates=Object.keys(db).sort();
+if(dates.length===0){alert('Data kosong'); return;}
+
+const monthText=new Date(dates[0].slice(0,7))
+.toLocaleDateString('id-ID',{month:'long',year:'numeric'}).toUpperCase();
+pdf.setFontSize(12);
+pdf.text(monthText,10,y); y+=6;
+
+let grandTotal=0;
+let grandProfit=0;
+
+dates.forEach(dateKey=>{
+const rows=db[dateKey];
+let totalTanggal=0;
+
+pdf.setFontSize(10);
+pdf.rect(10,y,190,7);
+pdf.text('TANGGAL',12,y+5);
+pdf.text('TRANSAKSI',55,y+5);
+pdf.text('JUMLAH',105,y+5);
+pdf.text('ADMIN',135,y+5);
+pdf.text('TOTAL',165,y+5);
+y+=7;
+
+rows.forEach(r=>{
+const total=r.jumlah+r.admin;
+const profit=Math.max(r.admin-1,0);
+totalTanggal+=total;
+grandProfit+=profit;
+
+pdf.rect(10,y,190,7);
+pdf.text(tglIndo(dateKey),12,y+5);
+pdf.text(r.transaksi,55,y+5);
+pdf.text(rupiah(r.jumlah),105,y+5,{align:'right'});
+pdf.text(rupiah(r.admin),135,y+5,{align:'right'});
+pdf.text(rupiah(total),165,y+5,{align:'right'});
+y+=7;
+if(y>270){pdf.addPage(); y=12;}
+});
+
+pdf.rect(10,y,190,7);
+pdf.text('TOTAL',135,y+5);
+pdf.text(rupiah(totalTanggal),165,y+5,{align:'right'});
+y+=10;
+grandTotal+=totalTanggal;
+});
+
+pdf.setFontSize(12);
+pdf.text('GRAND TOTAL',110,y);
+pdf.text(rupiah(grandTotal),165,y,{align:'right'});
+y+=6;
+pdf.text('GRAND TOTAL PROFIT',110,y);
+pdf.text(rupiah(grandProfit),165,y,{align:'right'});
+
+pdf.save('rekap-bulanan-rapi-profit.pdf');
+}
+
+tanggalInput.addEventListener('change',()=>{
+tanggalText.textContent=tglIndo(tanggalInput.value);
+loadTanggal();
+});
+
+loadDB();
+</script>
+
+</body>
+</html>
